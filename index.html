@@ -107,10 +107,74 @@ function showScreen(which){[loginScreen,menuScreen].forEach(x=>x.classList.remov
 function showMsg(el,text){el.textContent=text;el.style.display='block'}function clearMsg(el){el.style.display='none'}
 function submittedKey(stage){return 'etika_app_submitted__'+stage+'__'+studentName}function hasSubmitted(stage){return localStorage.getItem(submittedKey(stage))==='1'}
 function setStudent(name){studentName=name;studentNameView.textContent=name;obsStudentLabel.textContent='Peserta didik: '+name;postStudentLabel.textContent='Peserta didik: '+name;document.getElementById('obsNama').value=name;document.getElementById('postNama').value=name;}
-loginBtn.addEventListener('click',()=>{clearMsg(loginErr);if(!loginName.value){showMsg(loginErr,'Silakan pilih nama terlebih dahulu.');loginName.focus();return}setStudent(loginName.value);showScreen('menu');});
+loginBtn.addEventListener('click',()=>{clearMsg(loginErr);if(!loginName.value){showMsg(loginErr,'Silakan pilih nama terlebih dahulu.');loginName.focus();return}setStudent(loginName.value);restoreState();showScreen('menu');});
 document.getElementById('openObs').addEventListener('click',()=>{showScreen('obs');});document.getElementById('openPost').addEventListener('click',()=>{showScreen('post');});document.querySelectorAll('[data-back-menu]').forEach(b=>b.addEventListener('click',()=>showScreen('menu')));
-obsForm.addEventListener('submit',e=>{e.preventDefault();const err=document.getElementById('obsErr');clearMsg(err);if(!SCRIPT_URL||SCRIPT_URL.startsWith('PASTE_')){showMsg(err,'URL Google Apps Script belum dimasukkan ke file HTML.');return}if(!studentName){showMsg(err,'Nama belum dipilih.');return}if(hasSubmitted('Observasi Awal')){showMsg(err,'Observasi Awal untuk nama ini sudah pernah dikirim.');return}if(!obsForm.checkValidity()){obsForm.reportValidity();showMsg(err,'Masih ada jawaban yang belum diisi.');return}const key=['A','B','C','C','C','C','C','C'];let score=0;for(let i=1;i<=8;i++){const s=obsForm.querySelector('input[name="B_'+i+'"]:checked');if(s&&s.value===key[i-1])score++}document.getElementById('obsDiagnosticScore').value=score;document.getElementById('obsTimestamp').value=new Date().toISOString();const send=document.getElementById('obsSend');send.disabled=true;send.textContent='Mengirim...';obsForm.action=SCRIPT_URL;obsForm.submit();});
-postForm.addEventListener('submit',e=>{e.preventDefault();const err=document.getElementById('postErr');clearMsg(err);if(!SCRIPT_URL||SCRIPT_URL.startsWith('PASTE_')){showMsg(err,'URL Google Apps Script belum dimasukkan ke file HTML.');return}if(!studentName){showMsg(err,'Nama belum dipilih.');return}if(hasSubmitted('Posttest')){showMsg(err,'Post-Test untuk nama ini sudah pernah dikirim.');return}if(!postForm.checkValidity()){postForm.reportValidity();showMsg(err,'Masih ada jawaban yang belum diisi.');return}const key=['C','B','C','B','B','C','C','B'];let score=0;for(let i=1;i<=8;i++){const s=postForm.querySelector('input[name="B_'+i+'"]:checked');if(s&&s.value===key[i-1])score++}document.getElementById('postPgScore').value=score;document.getElementById('postTimestamp').value=new Date().toISOString();const send=document.getElementById('postSend');send.disabled=true;send.textContent='Mengirim...';postForm.action=SCRIPT_URL;postForm.submit();});
-window.addEventListener('message',e=>{const d=e.data||{};if(d.type!=='ETIKA_SUBMIT_RESULT')return;if(d.stage==='Observasi Awal'){const send=document.getElementById('obsSend'),ok=document.getElementById('obsOk'),err=document.getElementById('obsErr');if(d.ok){localStorage.setItem(submittedKey('Observasi Awal'),'1');showMsg(ok,'Observasi Awal berhasil disimpan.');send.textContent='Sudah Terkirim ✓';send.disabled=true;obsForm.querySelectorAll('input,textarea,button').forEach(x=>x.disabled=true);obsSuccessModal.classList.add('show')}else{send.disabled=false;send.textContent='Kirim Observasi Awal';showMsg(err,d.message||'Observasi Awal belum berhasil disimpan.')}}if(d.stage==='Posttest'){const send=document.getElementById('postSend'),ok=document.getElementById('postOk'),err=document.getElementById('postErr');if(d.ok){localStorage.setItem(submittedKey('Posttest'),'1');showMsg(ok,'Post-Test dan refleksi berhasil disimpan. Terima kasih, '+studentName+'!');send.textContent='Sudah Terkirim ✓';send.disabled=true;postForm.querySelectorAll('input,textarea,button').forEach(x=>x.disabled=true)}else{send.disabled=false;send.textContent='Kirim Post-Test & Refleksi';showMsg(err,d.message||'Post-Test belum berhasil disimpan.')}}});
+const pending={obs:false,post:false};
+function setSubmittedUI(stage){
+  const form=stage==='Observasi Awal'?obsForm:postForm;
+  const send=document.getElementById(stage==='Observasi Awal'?'obsSend':'postSend');
+  const ok=document.getElementById(stage==='Observasi Awal'?'obsOk':'postOk');
+  if(!form||!send)return;
+  localStorage.setItem(submittedKey(stage),'1');
+  send.textContent='Sudah Terkirim ✓';
+  send.disabled=true;
+  form.querySelectorAll('input,textarea,button').forEach(x=>{x.disabled=true});
+  if(ok)showMsg(ok,stage==='Observasi Awal'?'Observasi Awal berhasil disimpan.':'Post-Test dan refleksi berhasil disimpan. Terima kasih, '+studentName+'!');
+}
+function restoreState(){
+  if(!studentName)return;
+  if(hasSubmitted('Observasi Awal'))setSubmittedUI('Observasi Awal');
+  if(hasSubmitted('Posttest'))setSubmittedUI('Posttest');
+}
+obsForm.addEventListener('submit',e=>{
+  e.preventDefault();
+  const err=document.getElementById('obsErr'); clearMsg(err);
+  if(!SCRIPT_URL||SCRIPT_URL.startsWith('PASTE_')){showMsg(err,'URL Google Apps Script belum dimasukkan ke file HTML.');return}
+  if(!studentName){showMsg(err,'Nama belum dipilih.');return}
+  if(hasSubmitted('Observasi Awal')){showMsg(err,'Observasi Awal untuk nama ini sudah pernah dikirim.');return}
+  if(!obsForm.checkValidity()){obsForm.reportValidity();showMsg(err,'Masih ada jawaban yang belum diisi.');return}
+  const key=['A','B','C','C','C','C','C','C'];let score=0;
+  for(let i=1;i<=8;i++){const s=obsForm.querySelector('input[name="B_'+i+'"]:checked');if(s&&s.value===key[i-1])score++;}
+  document.getElementById('obsDiagnosticScore').value=score;
+  document.getElementById('obsTimestamp').value=new Date().toISOString();
+  const send=document.getElementById('obsSend');
+  send.disabled=true; send.textContent='Mengirim...'; pending.obs=true;
+  obsForm.action=SCRIPT_URL; obsForm.submit();
+});
+postForm.addEventListener('submit',e=>{
+  e.preventDefault();
+  const err=document.getElementById('postErr'); clearMsg(err);
+  if(!SCRIPT_URL||SCRIPT_URL.startsWith('PASTE_')){showMsg(err,'URL Google Apps Script belum dimasukkan ke file HTML.');return}
+  if(!studentName){showMsg(err,'Nama belum dipilih.');return}
+  if(hasSubmitted('Posttest')){showMsg(err,'Post-Test untuk nama ini sudah pernah dikirim.');return}
+  if(!postForm.checkValidity()){postForm.reportValidity();showMsg(err,'Masih ada jawaban yang belum diisi.');return}
+  const key=['C','B','C','B','B','C','C','B'];let score=0;
+  for(let i=1;i<=8;i++){const s=postForm.querySelector('input[name="B_'+i+'"]:checked');if(s&&s.value===key[i-1])score++;}
+  document.getElementById('postPgScore').value=score;
+  document.getElementById('postTimestamp').value=new Date().toISOString();
+  const send=document.getElementById('postSend');
+  send.disabled=true; send.textContent='Mengirim...'; pending.post=true;
+  postForm.action=SCRIPT_URL; postForm.submit();
+});
+window.addEventListener('message',e=>{
+  const d=e.data||{}; if(d.type!=='ETIKA_SUBMIT_RESULT')return;
+  if(d.stage==='Observasi Awal'){
+    pending.obs=false;
+    const send=document.getElementById('obsSend'),ok=document.getElementById('obsOk'),err=document.getElementById('obsErr');
+    if(d.ok){setSubmittedUI('Observasi Awal');obsSuccessModal.classList.add('show');}
+    else{send.disabled=false;send.textContent='Kirim Observasi Awal';showMsg(err,d.message||'Observasi Awal belum berhasil disimpan.');}
+  }
+  if(d.stage==='Posttest'){
+    pending.post=false;
+    const send=document.getElementById('postSend'),err=document.getElementById('postErr');
+    if(d.ok){setSubmittedUI('Posttest');}
+    else{send.disabled=false;send.textContent='Kirim Post-Test & Refleksi';showMsg(err,d.message||'Post-Test belum berhasil disimpan.');}
+  }
+});
+// Fallback: if the response frame loads but a postMessage is swallowed by the wrapper,
+// give the user a clear retry message rather than leaving the button stuck on "Mengirim...".
+setTimeout(()=>{if(pending.obs){pending.obs=false;const send=document.getElementById('obsSend'),err=document.getElementById('obsErr');send.disabled=false;send.textContent='Kirim Observasi Awal';showMsg(err,'Data sedang diproses. Silakan periksa Sheet. Jika data sudah masuk, jangan kirim ulang.');}},10000);
+setTimeout(()=>{if(pending.post){pending.post=false;const send=document.getElementById('postSend'),err=document.getElementById('postErr');send.disabled=false;send.textContent='Kirim Post-Test & Refleksi';showMsg(err,'Data sedang diproses. Silakan periksa Sheet. Jika data sudah masuk, jangan kirim ulang.');}},10000);
+restoreState();
 document.getElementById('goPostFromModal').addEventListener('click',()=>{obsSuccessModal.classList.remove('show');showScreen('post')});document.getElementById('closeModal').addEventListener('click',()=>{obsSuccessModal.classList.remove('show');showScreen('menu')});
 </script></body></html>
